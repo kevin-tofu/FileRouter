@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "filerouter"
+version = "0.1.0"
+description = ""
+authors = ["kohei <koheitech001@gmail.com>"]
+license = "Apach-2.0"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+fastapi = "^0.97.0"
+httpx = "^0.24.1"
+python-multipart = "^0.0.6"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
