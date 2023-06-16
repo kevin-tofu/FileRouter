@@ -8,7 +8,7 @@ from typing import Optional
 import glob
 
 import filerouter
-
+from filerouter import processType
 
 class myProcessor(filerouter.processor):
     def __init__(self):
@@ -75,7 +75,12 @@ async def zip(
         test = test
     )
     return await handler.post_file(
-        "zip", file, None, bgtask, **params
+        "zip", 
+        processType.FILE
+        file,
+        None,
+        bgtask,
+        **params
     )
 
 
@@ -92,7 +97,14 @@ async def files(
     )
     # print(params)
 
-    return await handler.post_files("files", files, None, bgtask, **params)
+    return await handler.post_file(
+        "files",
+        processType.FILE
+        files,
+        None,
+        bgtask,
+        **params
+    )
 
 
 @test_router.post('/files-bytesio')
@@ -107,7 +119,10 @@ async def files(
     )
     # print(params)
 
-    return await handler.post_files_BytesIO(
-        "files", files, **params
+    return await handler.post_file(
+        "files", 
+        processType.BYTESIO
+        files,
+        **params
     )
 
