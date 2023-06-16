@@ -28,31 +28,32 @@ handler = filerouter.router(myprocessor(), filerouter.config(**test_config))
 ```
 
 ```python
+
 class myProcessor(filerouter.processor):
     def __init__(self):
         super().__init__()
 
-    async def process_files(
+    async def post_files_process(
         self,
         process_name: str,
-        fpath_files: List[str],
-        fpath_dst: Optional[str] = None,
+        files_org_info: list[dict],
+        file_dst_path: Optional[str] = None,
+        bgtask: BackgroundTasks=BackgroundTasks(),
         **kwargs
-    ) -> dict:
-        # if process_name == "files":
+    ):
         return dict(status = "OK")
 
 
-    async def process_file(
+    async def post_file_process(
         self,
         process_name: str,
-        fpath_org: str,
-        fpath_dst: Optional[str] = None,
-        bgtask: Optional[BackgroundTasks] = None,
+        file_org_info: list[dict],
+        file_dst_path: Optional[str] = None,
+        bgtask: BackgroundTasks=BackgroundTasks(),
         **kwargs
     ):
         # print(fpath_org)
-        zipped_file_path_extact = os.path.splitext(fpath_org)[0]
+        zipped_file_path_extact = os.path.splitext(file_org_info['path'])[0]
         print('zipped_file_path_extact:', zipped_file_path_extact)
         zippedFile_list = list()
         for file_path in glob.glob(f"{zipped_file_path_extact}/*"):
@@ -62,36 +63,41 @@ class myProcessor(filerouter.processor):
         return dict(status = "ok", zippedFiles=zippedFile_list)
 
 
-    async def process_bytes(
+    async def post_BytesIO_process(
         self,
-        process_name :str,
-        data: dict,
-        bgtask: Optional[BackgroundTasks] = None,
+        process_name: str,
+        file_org_info: dict,
+        file_dst_path: Optional[str] = None,
+        bgtask: BackgroundTasks=BackgroundTasks(),
         **kwargs
     ):
 
         # do stuff
         return dict(
-            filename=data['filename'],
-            sentence=data["bytesio"].getvalue().decode('utf-8')
+            filename=file_org_info['name'],
+            sentence=file_org_info["bytesio"].getvalue().decode('utf-8')
         )
 
-    async def process_bytes_list(
+    async def post_ListBytesIO_process(
         self,
-        process_name :str,
-        data_list: list[dict],
-        bgtask: Optional[BackgroundTasks] = None,
+        process_name: str,
+        files_org_info: list[dict],
+        file_dst_path: Optional[str] = None,
+        bgtask: BackgroundTasks=BackgroundTasks(),
         **kwargs
     ):
         ret = list()
-        for data in data_list:
-            # data['bytesio'] # 
+        for data in files_org_info:
             ret.append(
                 dict(
-                    filename=data['filename'],
+                    filename=data['name'],
                     sentence=data["bytesio"].getvalue().decode('utf-8')
                 )
             )
 
         return dict(info=ret)
+
+
+handler = filerouter.router(myProcessor(), filerouter.config())
+
 ```
