@@ -1,9 +1,9 @@
 
 # filerouter  
 
-## What this repository is going to solve
+## What this repository is going to resolve
 
-This library provides functions for routing media such as images and videos via FastAPI.
+This library provides functions for routing files such as text and zip via FastAPI.
 
 ## How to install
 

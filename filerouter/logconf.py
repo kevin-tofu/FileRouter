@@ -8,4 +8,4 @@ logging.root.setLevel(logging.INFO)
 logging.basicConfig(level=logging.INFO, format=format)
 # logging.basicConfig(level=logging.DEBUG, format=format)
 
-medialogger = logging.getLogger
+frouterlogger = logging.getLogger

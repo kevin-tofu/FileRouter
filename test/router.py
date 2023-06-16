@@ -3,13 +3,9 @@ import os, sys
 import io
 from fastapi import APIRouter, File, UploadFile, Header, Depends
 from fastapi import BackgroundTasks
-from fastapi import Response
-from typing import List, Optional
+# from fastapi import Response
+from typing import Optional
 import glob
-
-# print(f"{os.pardir}/filerouter")
-# sys.path.append(f"{os.pardir}/filerouter/")
-# print(sys.path)
 
 import filerouter
 
@@ -18,27 +14,27 @@ class myProcessor(filerouter.processor):
     def __init__(self):
         super().__init__()
 
-    async def process_files(
+    async def post_files_process(
         self,
         process_name: str,
-        fpath_files: List[str],
-        fpath_dst: Optional[str] = None,
+        files_org_info: list[dict],
+        file_dst_path: Optional[str] = None,
+        bgtask: BackgroundTasks=BackgroundTasks(),
         **kwargs
-    ) -> dict:
-        # if process_name == "files":
+    ):
         return dict(status = "OK")
 
 
-    async def process_file(
+    async def post_file_process(
         self,
         process_name: str,
-        fpath_org: str,
-        fpath_dst: Optional[str] = None,
-        bgtask: Optional[BackgroundTasks] = None,
+        file_org_info: list[dict],
+        file_dst_path: Optional[str] = None,
+        bgtask: BackgroundTasks=BackgroundTasks(),
         **kwargs
     ):
         # print(fpath_org)
-        zipped_file_path_extact = os.path.splitext(fpath_org)[0]
+        zipped_file_path_extact = os.path.splitext(file_org_info['path'])[0]
         print('zipped_file_path_extact:', zipped_file_path_extact)
         zippedFile_list = list()
         for file_path in glob.glob(f"{zipped_file_path_extact}/*"):
@@ -48,33 +44,35 @@ class myProcessor(filerouter.processor):
         return dict(status = "ok", zippedFiles=zippedFile_list)
 
 
-    async def process_bytes(
+    async def post_BytesIO_process(
         self,
-        process_name :str,
-        data: dict,
-        bgtask: Optional[BackgroundTasks] = None,
+        process_name: str,
+        file_org_info: dict,
+        file_dst_path: Optional[str] = None,
+        bgtask: BackgroundTasks=BackgroundTasks(),
         **kwargs
     ):
 
         # do stuff
         return dict(
-            filename=data['filename'],
-            sentence=data["bytesio"].getvalue().decode('utf-8')
+            filename=file_org_info['name'],
+            sentence=file_org_info["bytesio"].getvalue().decode('utf-8')
         )
 
-    async def process_bytes_list(
+    async def post_ListBytesIO_process(
         self,
-        process_name :str,
-        data_list: list[dict],
-        bgtask: Optional[BackgroundTasks] = None,
+        process_name: str,
+        files_org_info: list[dict],
+        file_dst_path: Optional[str] = None,
+        bgtask: BackgroundTasks=BackgroundTasks(),
         **kwargs
     ):
         ret = list()
-        for data in data_list:
+        for data in files_org_info:
             # data['bytesio'] # 
             ret.append(
                 dict(
-                    filename=data['filename'],
+                    filename=data['name'],
                     sentence=data["bytesio"].getvalue().decode('utf-8')
                 )
             )
@@ -102,12 +100,14 @@ async def zip(
     params = dict(
         test = test
     )
-    return await handler.file_post("zip", file, None, bgtask, **params)
+    return await handler.post_file(
+        "zip", file, None, bgtask, **params
+    )
 
 
 @test_router.post('/files')
 async def files(
-    files: List[UploadFile],
+    files: list[UploadFile],
     bgtask: BackgroundTasks = BackgroundTasks(),
     test: Optional[int] = 0
 ):
@@ -118,12 +118,12 @@ async def files(
     )
     # print(params)
 
-    return await handler.files_post("files", files, "json", bgtask, **params)
+    return await handler.post_files("files", files, None, bgtask, **params)
 
 
 @test_router.post('/files-bytesio')
 async def files(
-    files: List[UploadFile],
+    files: list[UploadFile],
     test: Optional[int] = 0
 ):
     """
@@ -133,6 +133,7 @@ async def files(
     )
     # print(params)
 
-    # return await handler.file_posts("files", files, "json", bgtask, **params)
-    return await handler.files_post_BytesIO("files", files, **params)
+    return await handler.post_files_BytesIO(
+        "files", files, **params
+    )
 

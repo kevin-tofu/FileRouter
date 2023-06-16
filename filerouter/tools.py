@@ -10,8 +10,8 @@ import uuid
 import shutil
 import enum
 
-from filerouter.logconf import medialogger
-logger = medialogger(__name__)
+from filerouter.logconf import frouterlogger
+logger = frouterlogger(__name__)
 print('__name__', __name__)
 
 from io import BytesIO

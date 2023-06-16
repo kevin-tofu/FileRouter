@@ -1,24 +1,26 @@
 
-import os
-from typing import List, Optional
+import os, sys
+from typing import List, Union, Dict, Optional
 import zipfile
-
-# from fastapi.responses import FileResponse, JSONResponse
+import uuid
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi import HTTPException, BackgroundTasks
 from fastapi import Response, UploadFile
-# import numpy as np
 import io
 
-from filerouter import tools
-from filerouter.logconf import medialogger
-logger = medialogger(__name__)
+from filerouter.logconf import frouterlogger
+logger = frouterlogger(__name__)
 print('__name__', __name__)
+from filerouter import tools
+
 
 class config():
     def __init__(self, **kwargs):
 
         print("kwargs: ", kwargs)
-        self.path_data = kwargs["path_data"] if "path_data" in kwargs.keys() else "./temp"
+        self.path_data = kwargs["PATH_DATA"] if "PATH_DATA" in kwargs.keys() else "./temp"
+        # self.sleep_sec_remove = _config.SLEEP_SEC_REMOVE
+        # self.sleep_sec_remove_response = _config.SLEEP_SEC_REMOVE_RESPONSE
 
 
 class processor():
@@ -26,43 +28,58 @@ class processor():
     def __init__(self, **kwargs):
         pass
     
-    async def process_files(
+    async def post_files_process(
         self,
         process_name: str,
-        fpath_files: List[str],
-        fpath_dst: Optional[str] = None,
-        bgtask: Optional[BackgroundTasks] = None,
+        files_org_info: list[dict],
+        file_dst_path: Optional[str] = None,
+        bgtask: BackgroundTasks=BackgroundTasks(),
         **kwargs
     ):
         raise NotImplementedError()
 
-    async def process_file(
+
+    async def post_file_process(
         self,
         process_name: str,
-        fpath_org: str,
-        fpath_dst: Optional[str] = None,
-        bgtask: Optional[BackgroundTasks] = None,
+        file_org_info: list[dict],
+        file_dst_path: Optional[str] = None,
+        bgtask: BackgroundTasks=BackgroundTasks(),
         **kwargs
     ):
+
         raise NotImplementedError()
-    
-    async def process_bytes(
+
+
+    async def post_BytesIO_process(
         self,
-        process_name :str,
-        data: dict,
-        bgtask: Optional[BackgroundTasks] = None,
+        process_name: str,
+        file_org_info: dict,
+        file_dst_path: Optional[str] = None,
+        bgtask: BackgroundTasks=BackgroundTasks(),
         **kwargs
     ):
         raise NotImplementedError()
 
-    async def process_bytes_list(
+
+    async def post_ListBytesIO_process(
         self,
-        process_name :str,
-        data_list: list[dict],
-        bgtask: Optional[BackgroundTasks] = None,
+        process_name: str,
+        files_org_info: list[dict],
+        file_dst_path: Optional[str] = None,
+        bgtask: BackgroundTasks=BackgroundTasks(),
         **kwargs
     ):
         raise NotImplementedError()
+
+
+def preprocess_zip(path, fname, bgtask):
+    path_dir_export = f"{path}/{os.path.splitext(fname)[0]}"
+    os.makedirs(path_dir_export)
+    bgtask.add_task(tools.remove_dir, path_dir_export)
+    with zipfile.ZipFile(f"{path}/{fname}") as zf:
+        zf.extractall(path = path_dir_export)
+    bgtask.add_task(tools.remove_dir, path_dir_export)
 
 
 class router():
@@ -76,96 +93,64 @@ class router():
         self.config = config
         self.path_data = config.path_data
         os.makedirs(self.path_data, exist_ok=True)
+        
 
-
-    async def _files_post(
+    async def _post_files(
         self,
         process_name: str,
-        files_list: List[UploadFile],
+        files: list[UploadFile],
         retfile_extension: Optional[str] = None,
         bgtask: BackgroundTasks = BackgroundTasks(),
         **kwargs
     ):
-        kwargs['bgtask'] = bgtask
-        test = kwargs['test']
-        time_sleep = kwargs['time_sleep'] if 'time_sleep' in kwargs.keys() else 10
-
-        path_files_list = list()
-        fname_list = list()
-        fname_org_list = list()
-        for file in files_list:
+        
+        logger.info("post_files")
+        test = kwargs['test'] if 'test' in kwargs.keys() else 0
+        
+        uuid_path = f"{self.path_data}/{str(uuid.uuid4())}"
+        os.makedirs(uuid_path)
+        files_org_info = list()
+        for file in files:
 
             logger.info(f'{file.filename}, {file.content_type}')
-
             fname_org = file.filename
-            fname, uuid_f = tools.fname2uuid(fname_org)
-            tools.save_file(self.path_data, fname, file, test)
+            fname, _ = tools.fname2uuid(fname_org)
+            tools.save_file(uuid_path, fname, file, test)
 
-            fname_list.append(fname)
-            path_files_list.append(f"{self.path_data}/{fname}")
-            fname_org_list.append(fname_org)
-        
-        kwargs["fname_org_list"] = fname_org_list
-        bgtask.add_task(tools.remove_files, path_files_list, time_sleep)
+            files_org_info.append(
+                dict(
+                    path=f"{uuid_path}/{fname}",
+                    name_org=fname_org,
+                )
+            )
+            
+        bgtask.add_task(tools.remove_dir, uuid_path)
 
         if retfile_extension is not None:
             fname_dst = tools.make_fname_uuid(retfile_extension)
-            fpath_dst = f"{self.path_data}/{fname_dst}"
-            bgtask.add_task(tools.remove_file, fpath_dst, time_sleep)
+            file_dst_path = f"{uuid_path}/{fname_dst}"
+            bgtask.add_task(tools.remove_file, file_dst_path)
         else:
-            fpath_dst = None
+            file_dst_path = None
 
-        result = await self.processor.process_files(
+
+        result = await self.processor.post_files_process(
             process_name,
-            path_files_list,
-            fpath_dst,
+            files_org_info,
+            file_dst_path,
+            bgtask,
             **kwargs
         )
         
-        if type(fpath_dst) is str:
-            if os.path.exists(fpath_dst):
-                return self.post_processing(fpath_dst, **kwargs)
+        if type(file_dst_path) is str:
+            if os.path.exists(file_dst_path):
+                return self.post_processing(file_dst_path, **kwargs)
             else:
                 return result
         else:
             return result
-    
-    
-    async def files_post(
-        self,
-        process_name: str,
-        files_list: List[UploadFile],
-        retfile_extension: Optional[str] = None,
-        bgtask: BackgroundTasks = BackgroundTasks(),
-        **kwargs
-    ):
 
-        logger.info("files_post")
-        test = kwargs['test']
-        
-        if test == 1:
-            kwargs['time_sleep'] = 5
-            return await self._files_post(process_name, files_list, retfile_extension, bgtask, **kwargs)
 
-        else:
-            try:
-                return await self._files_post(process_name, files_list, retfile_extension, bgtask, **kwargs)
-            except:
-                raise HTTPException(status_code=503, detail="Error") 
-            finally:
-                # print("finally0")
-                pass
-            
-        
-    def zip_extractall(self, bgtask, file_name: str, time_sleep: int):
-        path_dir_export = f"{self.path_data}/{os.path.splitext(file_name)[0]}"
-        os.makedirs(path_dir_export)
-        bgtask.add_task(tools.remove_dir, path_dir_export, time_sleep)
-        with zipfile.ZipFile(f"{self.path_data}/{file_name}") as zf:
-            zf.extractall(path=path_dir_export)
-        bgtask.add_task(tools.remove_dir, path_dir_export, time_sleep)
-
-    
     async def _post_file(
         self,
         process_name: str,
@@ -174,38 +159,47 @@ class router():
         bgtask: BackgroundTasks = BackgroundTasks(),
         **kwargs
     ):
-        test = kwargs["test"]
+        logger.info("post_file")
+        test = kwargs['test'] if 'test' in kwargs.keys() else 0
+        uuid_path = f"{self.path_data}/{str(uuid.uuid4())}"
+        os.makedirs(uuid_path)
         fname_org = file.filename
         ftype_input = tools.check_filetype(fname_org)
-        fname, uuid_f = tools.fname2uuid(fname_org)
-        tools.save_file(self.path_data, fname, file, test)
-        kwargs["fname_org"] = fname_org
+        fname, _ = tools.fname2uuid(fname_org)
+        tools.save_file(uuid_path, fname, file, test)
+        file_org_info = dict(
+            path=f"{uuid_path}/{fname}",
+            name_org=fname_org,
+        )
 
-        time_sleep = kwargs['time_sleep'] if 'time_sleep' in kwargs.keys() else 10
-
-        
+        bgtask.add_task(tools.remove_dir, uuid_path)
         if ftype_input == tools.FileType.ZIP:
-            self.zip_extractall(bgtask, fname, time_sleep)
+            preprocess_zip(uuid_path, fname, bgtask)
             
         if retfile_extension is not None:
-            fname_dst = tools.addstr2fname(fname, "-res", ext = retfile_extension)
-            fpath_dst = f"{self.path_data}/{fname_dst}"
-            bgtask.add_task(tools.remove_file, fpath_dst, time_sleep)
+            fname_dst = tools.addstr2fname(fname, "-res", ext=retfile_extension)
+            file_dst_path = f"{uuid_path}/{fname_dst}"
         else:
-            fpath_dst = None
+            file_dst_path = None
 
-        result = await self.processor.process_file(
+        result = await self.processor.post_file_process(
             process_name,
-            f"{self.path_data}/{fname}",
-            fpath_dst,
+            file_org_info,
+            file_dst_path,
             bgtask,
             **kwargs
         )
-        bgtask.add_task(tools.remove_file, f"{self.path_data}/{fname}", time_sleep)
         
-        return result
-        
-    async def file_post(
+        if type(file_dst_path) is str:
+            if os.path.exists(file_dst_path):
+                return self.post_processing(file_dst_path, **kwargs)
+            else:
+                return result
+        else:
+            return result
+
+
+    async def _post_file_BytesIO(
         self,
         process_name: str,
         file: UploadFile,
@@ -214,113 +208,193 @@ class router():
         **kwargs
     ):
 
-        logger.info("file_post")
-        
-        if kwargs["test"] == 1:
-            kwargs['time_sleep'] = 5
-            return await self._post_file(process_name, file, retfile_extension, bgtask, **kwargs)
-
-        else:
-            try:
-                return await self._post_file(process_name, file, retfile_extension, bgtask, **kwargs)
-            except:
-                raise HTTPException(status_code=503, detail="Error") 
-            finally:
-                # print("finally0")
-                pass
-        
-    
-    async def _file_post_BytesIO(
-        self,
-        process_name: str,
-        file: UploadFile,
-        bgtask: Optional[BackgroundTasks] = None,
-        **kwargs
-    ):
-        fname_org = file.filename
-        file_byte = io.BytesIO(await file.read())
-
-        info = dict(
-            filename=fname_org,
-            bytesio=file_byte
+        logger.info("post_file_BytesIO")
+        fileInfo = dict(
+            name=file.filename,
+            bytesio=io.BytesIO(await file.read())
         )
-        return await self.processor.process_bytes(
+
+        if retfile_extension is not None:
+            uuid_path = f"{self.path_data}/{str(uuid.uuid4())}"
+            fname_dst = tools.addstr2fname(fileInfo['name'], "-res", ext=retfile_extension)
+            file_dst_path = f"{uuid_path}/{fname_dst}"
+        else:
+            file_dst_path = None
+
+        result = await self.processor.post_BytesIO_process(
             process_name,
-            info,
+            fileInfo,
+            file_dst_path,
             bgtask,
             **kwargs
         )
+        if type(file_dst_path) is str:
+            if os.path.exists(file_dst_path):
+                return self.post_processing(file_dst_path, **kwargs)
+            else:
+                return result
+        else:
+            return result
         
 
-    async def file_post_BytesIO(
+    async def _post_files_BytesIO(
         self,
         process_name: str,
-        file: UploadFile,
-        bgtask: Optional[BackgroundTasks] = None,
+        files: list[UploadFile],
+        retfile_extension: Optional[str] = None,
+        bgtask: BackgroundTasks = BackgroundTasks(),
         **kwargs
     ):
 
-        logger.info("file_post_BytesIO")
-
-        if kwargs['test'] == 1:
-            return self._file_post_BytesIO(process_name, process_name, file, bgtask, **kwargs)
-        else:
-            try:
-                return self._file_post_BytesIO(process_name, process_name, file, bgtask, **kwargs)
-            except:
-                raise HTTPException(status_code=503, detail="Error") 
-            finally:
-                # print("finally0")
-                pass
-
-    
-    async def _files_post_BytesIO(
-        self,
-        process_name: str,
-        files: List[UploadFile],
-        bgtask: Optional[BackgroundTasks] = None,
-        **kwargs
-    ):
-        files_list = list()
+        logger.info("post_files_BytesIO")
+        files_dict = list()
         for file in files:
             fname_org = file.filename
             file_byte = io.BytesIO(await file.read())
-            files_list.append(
+            files_dict.append(
                 dict(
-                    filename=fname_org,
+                    name=fname_org,
                     bytesio=file_byte
                 )
             )
 
-        result = await self.processor.process_bytes_list(
+        if retfile_extension is not None:
+            uuid_path = f"{self.path_data}/{str(uuid.uuid4())}"
+            fname_dst = tools.make_fname_uuid(retfile_extension)
+            file_dst_path = f"{uuid_path}/{fname_dst}"
+            bgtask.add_task(tools.remove_file, file_dst_path)
+        else:
+            file_dst_path = None
+
+        result = await self.processor.post_ListBytesIO_process(
             process_name,
-            files_list,
+            files_dict,
+            file_dst_path,
             bgtask,
             **kwargs
         )
-        return result
+        if type(file_dst_path) is str:
+            if os.path.exists(file_dst_path):
+                return self.post_processing(file_dst_path, **kwargs)
+            else:
+                return result
+        else:
+            return result
+    
 
-    async def files_post_BytesIO(
+    async def post_files_BytesIO(
         self,
         process_name: str,
         files: List[UploadFile],
-        bgtask: Optional[BackgroundTasks] = None,
+        retfile_extension: Optional[str] = None,
+        bgtask: BackgroundTasks = BackgroundTasks(),
         **kwargs
     ):
 
-        logger.info("files_post_BytesIO")
-        
         test = kwargs["test"]
         if test == 1:
+            return await self._post_files_BytesIO(process_name, files, retfile_extension, bgtask, **kwargs)
             
-            return await self._files_post_BytesIO(process_name, files, bgtask, **kwargs)
         else:
             try:
-                return await self._files_post_BytesIO(process_name, files, bgtask, **kwargs)
-                
+                return await self._post_files_BytesIO(process_name, files, retfile_extension, bgtask, **kwargs)
+
             except:
                 raise HTTPException(status_code=503, detail="Error") 
             finally:
                 # print("finally0")
                 pass
-                
+
+
+    async def post_file_BytesIO(
+        self,
+        process_name: str,
+        file: UploadFile,
+        retfile_extension: Optional[str] = None,
+        bgtask: BackgroundTasks = BackgroundTasks(),
+        **kwargs
+    ):
+
+        if kwargs['test'] == 1:
+            return await self._post_file_BytesIO(process_name, file, retfile_extension, bgtask, **kwargs)
+        else:
+            try:
+                return await self._post_file_BytesIO(process_name, file, retfile_extension, bgtask, **kwargs)
+            except:
+                raise HTTPException(status_code=503, detail="Error") 
+            finally:
+                # print("finally0")
+                pass
+
+
+    async def post_files(
+        self,
+        process_name: str,
+        files: List[UploadFile],
+        retfile_extension: Optional[str] = None,
+        bgtask: BackgroundTasks = BackgroundTasks(),
+        **kwargs
+    ):
+
+        test = kwargs['test']
+        if test == 1:
+            return await self._post_files(
+                process_name, files, retfile_extension, bgtask, **kwargs
+            )
+        else:
+            try:
+                return await self._post_files(
+                    process_name, files, retfile_extension, bgtask, **kwargs
+                )
+            except:
+                raise HTTPException(status_code=503, detail="Error") 
+            finally:
+                # print("finally0")
+                pass
+
+    
+    async def post_file(
+        self,
+        process_name: str,
+        file: UploadFile,
+        retfile_extension: Optional[str] = None,
+        bgtask: BackgroundTasks = BackgroundTasks(),
+        **kwargs
+    ):
+
+        test = kwargs["test"]
+        if test == 1:
+            return await self._post_file(
+                process_name,
+                file,
+                retfile_extension,
+                bgtask,
+                **kwargs
+            )
+
+        else:   
+            try:
+                return await self._post_file(
+                    process_name,
+                    file,
+                    retfile_extension,
+                    bgtask,
+                    **kwargs
+                )
+            except:
+                raise HTTPException(status_code=503, detail="Error") 
+            finally:
+                # print("finally0")
+                pass
+
+    def post_processing(self, file_dst_path: str, **kwargs):
+
+        ftype_dst = tools.check_filetype(file_dst_path)
+        fname = os.path.basename(file_dst_path)
+        ext = tools.get_file_extension(file_dst_path)
+        return FileResponse(
+            file_dst_path,
+            filename=f"{fname}",
+            media_type = f'video/{ext}'
+            # background=bgtask
+        )

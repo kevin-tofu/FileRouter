@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 APP_VERSION = os.getenv('APP_VERSION', 'v0'),
 APP_AUTHOR = os.getenv('APP_AUTHOR', 'kevin')
-APP_DATA_PATH = os.getenv('APP_DATA_PATH', './temp')
+APP_DATA_PATH = os.getenv('APP_DATA_PATH', './data')
 
 APP_PORT = int(os.getenv('APP_PORT', 80))
 

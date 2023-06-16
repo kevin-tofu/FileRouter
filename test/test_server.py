@@ -5,7 +5,7 @@ sys.path.append(f"{os.pardir}/filerouter/")
 from config import config_org
 
 app_data_path = config_org.app_data_path
-name_zip = 'test.zip'
+name_zip = 'abc.zip'
 
 from server import app
 testclient = TestClient(app)
