@@ -13,6 +13,13 @@ logger = frouterlogger(__name__)
 print('__name__', __name__)
 from filerouter import tools
 
+from enum import Flag, auto
+
+
+class processType(Flag):
+    BYTES = auto()
+    FILE = auto()
+
 
 class config():
     def __init__(self, **kwargs):
@@ -25,47 +32,13 @@ class config():
 
 class processor():
 
-    def __init__(self, **kwargs):
+    def __init__(self, cfg: Optional[dict]):
         pass
     
-    async def post_files_process(
+    async def post_process(
         self,
         process_name: str,
-        files_org_info: list[dict],
-        file_dst_path: Optional[str] = None,
-        bgtask: BackgroundTasks=BackgroundTasks(),
-        **kwargs
-    ):
-        raise NotImplementedError()
-
-
-    async def post_file_process(
-        self,
-        process_name: str,
-        file_org_info: list[dict],
-        file_dst_path: Optional[str] = None,
-        bgtask: BackgroundTasks=BackgroundTasks(),
-        **kwargs
-    ):
-
-        raise NotImplementedError()
-
-
-    async def post_BytesIO_process(
-        self,
-        process_name: str,
-        file_org_info: dict,
-        file_dst_path: Optional[str] = None,
-        bgtask: BackgroundTasks=BackgroundTasks(),
-        **kwargs
-    ):
-        raise NotImplementedError()
-
-
-    async def post_ListBytesIO_process(
-        self,
-        process_name: str,
-        files_org_info: list[dict],
+        files_org_info: dict,
         file_dst_path: Optional[str] = None,
         bgtask: BackgroundTasks=BackgroundTasks(),
         **kwargs
@@ -352,11 +325,14 @@ class router():
                 # print("finally0")
                 pass
 
+
+
     
     async def post_file(
         self,
         process_name: str,
-        file: UploadFile,
+        process_type: processType,
+        file: UploadFile | list[UploadFile],
         retfile_extension: Optional[str] = None,
         bgtask: BackgroundTasks = BackgroundTasks(),
         **kwargs
@@ -364,14 +340,41 @@ class router():
 
         test = kwargs["test"]
         if test == 1:
-            return await self._post_file(
-                process_name,
-                file,
-                retfile_extension,
-                bgtask,
-                **kwargs
-            )
-
+            if process_type == processType.FILE:
+                if type(file) is UploadFile:
+                    return await self._post_file(
+                        process_name,
+                            file,
+                            retfile_extension,
+                            bgtask,
+                            **kwargs
+                        )
+                    if type(file) is list[UploadFile]:
+                        return await self._post_files(
+                            process_name,
+                            file,
+                            retfile_extension,
+                            bgtask,
+                            **kwargs
+                        )
+                if process_type == processType.BYTESIO:
+                    
+                    if type(file) is UploadFile:
+                    return await self._post_file_bytesio(
+                        process_name,
+                            file,
+                            retfile_extension,
+                            bgtask,
+                            **kwargs
+                        )
+                    if type(file) is list[UploadFile]:
+                        return await self._post_files_bytesio(
+                            process_name,
+                            file,
+                            retfile_extension,
+                            bgtask,
+                            **kwargs
+                        )
         else:   
             try:
                 return await self._post_file(
