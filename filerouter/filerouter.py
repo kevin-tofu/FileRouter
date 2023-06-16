@@ -35,7 +35,7 @@ class processor():
     def __init__(self, cfg: Optional[dict]):
         pass
     
-    async def post_process(
+    async def post_file_process(
         self,
         process_name: str,
         files_org_info: dict,
