@@ -25,7 +25,7 @@ class config():
     def __init__(self, **kwargs):
 
         print("kwargs: ", kwargs)
-        self.path_data = kwargs["PATH_DATA"] if "PATH_DATA" in kwargs.keys() else "./temp"
+        self.data_path = kwargs["data_path"] if "data_path" in kwargs.keys() else "./temp"
         # self.sleep_sec_remove = _config.SLEEP_SEC_REMOVE
         # self.sleep_sec_remove_response = _config.SLEEP_SEC_REMOVE_RESPONSE
 
@@ -64,7 +64,7 @@ class router():
 
         self.processor = processor
         self.config = config
-        self.path_data = config.path_data
+        self.data_path = config.data_path
         os.makedirs(self.path_data, exist_ok=True)
         
 
@@ -106,10 +106,13 @@ class router():
         else:
             file_dst_path = None
 
-
-        result = await self.processor.post_files_process(
+        data = dict(
+            file=files_org_info,
+            file_dst_path=file_dst_path
+        )
+        result = await self.processor.post_file_process(
             process_name,
-            files_org_info,
+            data,
             file_dst_path,
             bgtask,
             **kwargs
@@ -154,10 +157,14 @@ class router():
             file_dst_path = f"{uuid_path}/{fname_dst}"
         else:
             file_dst_path = None
-
+        
+        data = dict(
+            file=file_org_info,
+            file_dst_path=file_dst_path
+        )
         result = await self.processor.post_file_process(
             process_name,
-            file_org_info,
+            data,
             file_dst_path,
             bgtask,
             **kwargs
@@ -193,8 +200,12 @@ class router():
             file_dst_path = f"{uuid_path}/{fname_dst}"
         else:
             file_dst_path = None
-
-        result = await self.processor.post_BytesIO_process(
+        
+        data = dict(
+            file=fileInfo,
+            file_dst_path=file_dst_path
+        )
+        result = await self.processor.post_file_process(
             process_name,
             fileInfo,
             file_dst_path,
@@ -239,9 +250,13 @@ class router():
         else:
             file_dst_path = None
 
-        result = await self.processor.post_ListBytesIO_process(
+        data = dict(
+            file=files_dict,
+            file_dst_path=file_dst_path
+        )
+        result = await self.processor.post_file_process(
             process_name,
-            files_dict,
+            data,
             file_dst_path,
             bgtask,
             **kwargs
@@ -255,79 +270,6 @@ class router():
             return result
     
 
-    async def post_files_BytesIO(
-        self,
-        process_name: str,
-        files: List[UploadFile],
-        retfile_extension: Optional[str] = None,
-        bgtask: BackgroundTasks = BackgroundTasks(),
-        **kwargs
-    ):
-
-        test = kwargs["test"]
-        if test == 1:
-            return await self._post_files_BytesIO(process_name, files, retfile_extension, bgtask, **kwargs)
-            
-        else:
-            try:
-                return await self._post_files_BytesIO(process_name, files, retfile_extension, bgtask, **kwargs)
-
-            except:
-                raise HTTPException(status_code=503, detail="Error") 
-            finally:
-                # print("finally0")
-                pass
-
-
-    async def post_file_BytesIO(
-        self,
-        process_name: str,
-        file: UploadFile,
-        retfile_extension: Optional[str] = None,
-        bgtask: BackgroundTasks = BackgroundTasks(),
-        **kwargs
-    ):
-
-        if kwargs['test'] == 1:
-            return await self._post_file_BytesIO(process_name, file, retfile_extension, bgtask, **kwargs)
-        else:
-            try:
-                return await self._post_file_BytesIO(process_name, file, retfile_extension, bgtask, **kwargs)
-            except:
-                raise HTTPException(status_code=503, detail="Error") 
-            finally:
-                # print("finally0")
-                pass
-
-
-    async def post_files(
-        self,
-        process_name: str,
-        files: List[UploadFile],
-        retfile_extension: Optional[str] = None,
-        bgtask: BackgroundTasks = BackgroundTasks(),
-        **kwargs
-    ):
-
-        test = kwargs['test']
-        if test == 1:
-            return await self._post_files(
-                process_name, files, retfile_extension, bgtask, **kwargs
-            )
-        else:
-            try:
-                return await self._post_files(
-                    process_name, files, retfile_extension, bgtask, **kwargs
-                )
-            except:
-                raise HTTPException(status_code=503, detail="Error") 
-            finally:
-                # print("finally0")
-                pass
-
-
-
-    
     async def post_file(
         self,
         process_name: str,
