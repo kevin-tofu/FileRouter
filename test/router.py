@@ -55,9 +55,8 @@ class myProcessor(filerouter.processor):
                         sentence=dloop["bytesio"].getvalue().decode('utf-8')
                     )
                 )
-        
-
             return dict(info=ret)
+        
         else:
             raise ValueError('')
             
