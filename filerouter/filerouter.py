@@ -6,6 +6,7 @@ import uuid
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi import HTTPException, BackgroundTasks
 from fastapi import Response, UploadFile
+import starlette
 import io
 
 from filerouter.logconf import frouterlogger
@@ -17,7 +18,7 @@ from enum import Flag, auto
 
 
 class processType(Flag):
-    BYTES = auto()
+    BYTESIO = auto()
     FILE = auto()
 
 
@@ -32,7 +33,7 @@ class config():
 
 class processor():
 
-    def __init__(self, cfg: Optional[dict]):
+    def __init__(self, cfg: Optional[dict] = None):
         pass
     
     async def post_file_process(
@@ -65,7 +66,7 @@ class router():
         self.processor = processor
         self.config = config
         self.data_path = config.data_path
-        os.makedirs(self.path_data, exist_ok=True)
+        os.makedirs(self.data_path, exist_ok=True)
         
 
     async def _post_files(
@@ -80,7 +81,7 @@ class router():
         logger.info("post_files")
         test = kwargs['test'] if 'test' in kwargs.keys() else 0
         
-        uuid_path = f"{self.path_data}/{str(uuid.uuid4())}"
+        uuid_path = f"{self.data_path}/{str(uuid.uuid4())}"
         os.makedirs(uuid_path)
         files_org_info = list()
         for file in files:
@@ -137,7 +138,7 @@ class router():
     ):
         logger.info("post_file")
         test = kwargs['test'] if 'test' in kwargs.keys() else 0
-        uuid_path = f"{self.path_data}/{str(uuid.uuid4())}"
+        uuid_path = f"{self.data_path}/{str(uuid.uuid4())}"
         os.makedirs(uuid_path)
         fname_org = file.filename
         ftype_input = tools.check_filetype(fname_org)
@@ -195,7 +196,7 @@ class router():
         )
 
         if retfile_extension is not None:
-            uuid_path = f"{self.path_data}/{str(uuid.uuid4())}"
+            uuid_path = f"{self.data_path}/{str(uuid.uuid4())}"
             fname_dst = tools.addstr2fname(fileInfo['name'], "-res", ext=retfile_extension)
             file_dst_path = f"{uuid_path}/{fname_dst}"
         else:
@@ -243,7 +244,7 @@ class router():
             )
 
         if retfile_extension is not None:
-            uuid_path = f"{self.path_data}/{str(uuid.uuid4())}"
+            uuid_path = f"{self.data_path}/{str(uuid.uuid4())}"
             fname_dst = tools.make_fname_uuid(retfile_extension)
             file_dst_path = f"{uuid_path}/{fname_dst}"
             bgtask.add_task(tools.remove_file, file_dst_path)
@@ -279,54 +280,45 @@ class router():
         bgtask: BackgroundTasks = BackgroundTasks(),
         **kwargs
     ):
-
+        
+        if process_type == processType.FILE:
+            if isinstance(file, starlette.datastructures.UploadFile):
+                func_temp = self._post_file
+            elif type(file) is list:
+                func_temp = self._post_files
+            else:
+                raise ValueError('')
+        elif process_type == processType.BYTESIO:
+            
+            if isinstance(file, starlette.datastructures.UploadFile):
+                func_temp = self._post_file_BytesIO
+            elif type(file) is list:
+                func_temp = self._post_files_BytesIO
+            else:
+                raise ValueError('')
+        else:
+            raise ValueError('')
+        
         test = kwargs["test"]
         if test == 1:
-            if process_type == processType.FILE:
-                if type(file) is UploadFile:
-                    return await self._post_file(
-                        process_name,
-                            file,
-                            retfile_extension,
-                            bgtask,
-                            **kwargs
-                        )
-                    if type(file) is list[UploadFile]:
-                        return await self._post_files(
-                            process_name,
-                            file,
-                            retfile_extension,
-                            bgtask,
-                            **kwargs
-                        )
-                if process_type == processType.BYTESIO:
-                    
-                    if type(file) is UploadFile:
-                    return await self._post_file_bytesio(
-                        process_name,
-                            file,
-                            retfile_extension,
-                            bgtask,
-                            **kwargs
-                        )
-                    if type(file) is list[UploadFile]:
-                        return await self._post_files_bytesio(
-                            process_name,
-                            file,
-                            retfile_extension,
-                            bgtask,
-                            **kwargs
-                        )
+            return await func_temp(
+                process_name,
+                file,
+                retfile_extension,
+                bgtask,
+                **kwargs
+            )
         else:   
             try:
-                return await self._post_file(
+                return await func_temp(
                     process_name,
                     file,
                     retfile_extension,
                     bgtask,
                     **kwargs
                 )
-            except:
+            except Exception as e:
+                frouterlogger.error(f"Error Occurs: {e}", exc_info=True)
                 raise HTTPException(status_code=503, detail="Error") 
             finally:
                 # print("finally0")

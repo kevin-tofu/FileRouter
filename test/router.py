@@ -17,16 +17,20 @@ class myProcessor(filerouter.processor):
     async def post_file_process(
         self,
         process_name: str,
-        files_org_info: dict,
+        data: dict,
         file_dst_path: Optional[str] = None,
         bgtask: BackgroundTasks=BackgroundTasks(),
         **kwargs
     ):
-        if process_name == '':
-            return dict(status = "OK")
+        print(process_name)
+        if process_name == 'files':
+            ret = list()
+            for d in data['file']:
+                ret.append(os.path.basename(d['path']))
+            return dict(status = "OK", fnamelist=ret)
         
-        elif pro == 'm':
-            zipped_file_path_extact = os.path.splitext(file_org_info['path'])[0]
+        elif process_name == 'zip':
+            zipped_file_path_extact = os.path.splitext(data['file']['path'])[0]
             print('zipped_file_path_extact:', zipped_file_path_extact)
             zippedFile_list = list()
             for file_path in glob.glob(f"{zipped_file_path_extact}/*"):
@@ -34,24 +38,28 @@ class myProcessor(filerouter.processor):
                 zippedFile_list.append(file_path)
 
             return dict(status = "ok", zippedFiles=zippedFile_list)
-        elif aa == 'm':
+        elif process_name == 'file-bytesio':
+            
             return dict(
-                filename=file_org_info['name'],
-                sentence=file_org_info["bytesio"].getvalue().decode('utf-8')
+                filename=data['name'],
+                sentence=data["bytesio"].getvalue().decode('utf-8')
             )
-        elif aa == '':
-             ret = list()
-            for data in files_org_info:
+        
+        elif process_name == 'files-bytesio':
+            ret = list()
+            for dloop in data['file']:
                 # data['bytesio'] # 
                 ret.append(
                     dict(
-                        filename=data['name'],
-                        sentence=data["bytesio"].getvalue().decode('utf-8')
+                        filename=dloop['name'],
+                        sentence=dloop["bytesio"].getvalue().decode('utf-8')
                     )
                 )
+        
 
             return dict(info=ret)
-
+        else:
+            raise ValueError('')
             
 
     
@@ -76,7 +84,7 @@ async def zip(
     )
     return await handler.post_file(
         "zip", 
-        processType.FILE
+        processType.FILE,
         file,
         None,
         bgtask,
@@ -99,7 +107,7 @@ async def files(
 
     return await handler.post_file(
         "files",
-        processType.FILE
+        processType.FILE,
         files,
         None,
         bgtask,
@@ -120,8 +128,8 @@ async def files(
     # print(params)
 
     return await handler.post_file(
-        "files", 
-        processType.BYTESIO
+        "files-bytesio", 
+        processType.BYTESIO,
         files,
         **params
     )
