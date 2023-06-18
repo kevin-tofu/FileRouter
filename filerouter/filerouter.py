@@ -208,7 +208,7 @@ class router():
         )
         result = await self.processor.post_file_process(
             process_name,
-            fileInfo,
+            data,
             file_dst_path,
             bgtask,
             **kwargs
