@@ -8,7 +8,7 @@ from fastapi import HTTPException, BackgroundTasks
 from fastapi import Response, UploadFile
 import starlette
 import io
-
+from dataclasses import dataclass
 from filerouter.logconf import frouterlogger
 logger = frouterlogger(__name__)
 print('__name__', __name__)
@@ -17,6 +17,12 @@ from filerouter import tools
 from enum import Flag, auto
 
 
+@dataclass
+class fileInfo():
+    path: Optional[str]=None
+    name: Optional[str]=None
+    bytesio: Optional[io.BytesIO]=None
+
 class processType(Flag):
     BYTESIO = auto()
     FILE = auto()
@@ -24,12 +30,8 @@ class processType(Flag):
 
 class config():
     def __init__(self, **kwargs):
-
-        print("kwargs: ", kwargs)
+        # print("kwargs: ", kwargs)
         self.data_path = kwargs["data_path"] if "data_path" in kwargs.keys() else "./temp"
-        # self.sleep_sec_remove = _config.SLEEP_SEC_REMOVE
-        # self.sleep_sec_remove_response = _config.SLEEP_SEC_REMOVE_RESPONSE
-
 
 class processor():
 
@@ -39,7 +41,7 @@ class processor():
     async def post_file_process(
         self,
         process_name: str,
-        files_org_info: dict,
+        files_org_info: fileInfo | list[fileInfo],
         file_dst_path: Optional[str] = None,
         bgtask: BackgroundTasks=BackgroundTasks(),
         **kwargs
@@ -92,9 +94,9 @@ class router():
             tools.save_file(uuid_path, fname, file, test)
 
             files_org_info.append(
-                dict(
+                fileInfo(
                     path=f"{uuid_path}/{fname}",
-                    name_org=fname_org,
+                    name=fname_org,
                 )
             )
             
@@ -107,13 +109,9 @@ class router():
         else:
             file_dst_path = None
 
-        data = dict(
-            file=files_org_info,
-            file_dst_path=file_dst_path
-        )
         result = await self.processor.post_file_process(
             process_name,
-            data,
+            files_org_info,
             file_dst_path,
             bgtask,
             **kwargs
@@ -144,9 +142,9 @@ class router():
         ftype_input = tools.check_filetype(fname_org)
         fname, _ = tools.fname2uuid(fname_org)
         tools.save_file(uuid_path, fname, file, test)
-        file_org_info = dict(
+        file_org_info = fileInfo(
             path=f"{uuid_path}/{fname}",
-            name_org=fname_org,
+            name=fname_org,
         )
 
         bgtask.add_task(tools.remove_dir, uuid_path)
@@ -158,14 +156,10 @@ class router():
             file_dst_path = f"{uuid_path}/{fname_dst}"
         else:
             file_dst_path = None
-        
-        data = dict(
-            file=file_org_info,
-            file_dst_path=file_dst_path
-        )
+
         result = await self.processor.post_file_process(
             process_name,
-            data,
+            file_org_info,
             file_dst_path,
             bgtask,
             **kwargs
@@ -190,21 +184,16 @@ class router():
     ):
 
         logger.info("post_file_BytesIO")
-        fileInfo = dict(
-            name=file.filename,
-            bytesio=io.BytesIO(await file.read())
-        )
-
         if retfile_extension is not None:
             uuid_path = f"{self.data_path}/{str(uuid.uuid4())}"
-            fname_dst = tools.addstr2fname(fileInfo['name'], "-res", ext=retfile_extension)
+            fname_dst = tools.addstr2fname(file.filename, "-res", ext=retfile_extension)
             file_dst_path = f"{uuid_path}/{fname_dst}"
         else:
             file_dst_path = None
         
-        data = dict(
-            file=fileInfo,
-            file_dst_path=file_dst_path
+        data = fileInfo(
+            name=file.filename,
+            bytesio=io.BytesIO(await file.read())
         )
         result = await self.processor.post_file_process(
             process_name,
@@ -232,12 +221,12 @@ class router():
     ):
 
         logger.info("post_files_BytesIO")
-        files_dict = list()
+        files_info = list()
         for file in files:
             fname_org = file.filename
             file_byte = io.BytesIO(await file.read())
-            files_dict.append(
-                dict(
+            files_info.append(
+                fileInfo(
                     name=fname_org,
                     bytesio=file_byte
                 )
@@ -251,13 +240,9 @@ class router():
         else:
             file_dst_path = None
 
-        data = dict(
-            file=files_dict,
-            file_dst_path=file_dst_path
-        )
         result = await self.processor.post_file_process(
             process_name,
-            data,
+            files_info,
             file_dst_path,
             bgtask,
             **kwargs

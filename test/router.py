@@ -17,7 +17,7 @@ class myProcessor(filerouter.processor):
     async def post_file_process(
         self,
         process_name: str,
-        data: dict,
+        data: filerouter.fileInfo | list[filerouter.fileInfo],
         file_dst_path: Optional[str] = None,
         bgtask: BackgroundTasks=BackgroundTasks(),
         **kwargs
@@ -25,12 +25,12 @@ class myProcessor(filerouter.processor):
         print(process_name)
         if process_name == 'files':
             ret = list()
-            for d in data['file']:
-                ret.append(os.path.basename(d['path']))
+            for d in data:
+                ret.append(os.path.basename(d.path))
             return dict(status = "OK", fnamelist=ret)
         
         elif process_name == 'zip':
-            zipped_file_path_extact = os.path.splitext(data['file']['path'])[0]
+            zipped_file_path_extact = os.path.splitext(data.path)[0]
             print('zipped_file_path_extact:', zipped_file_path_extact)
             zippedFile_list = list()
             for file_path in glob.glob(f"{zipped_file_path_extact}/*"):
@@ -41,18 +41,17 @@ class myProcessor(filerouter.processor):
         elif process_name == 'file-bytesio':
             
             return dict(
-                filename=data['name'],
-                sentence=data["bytesio"].getvalue().decode('utf-8')
+                filename=data.name,
+                sentence=data.bytesio.getvalue().decode('utf-8')
             )
         
         elif process_name == 'files-bytesio':
             ret = list()
-            for dloop in data['file']:
-                # data['bytesio'] # 
+            for dloop in data:
                 ret.append(
                     dict(
-                        filename=dloop['name'],
-                        sentence=dloop["bytesio"].getvalue().decode('utf-8')
+                        filename=dloop.name,
+                        sentence=dloop.bytesio.getvalue().decode('utf-8')
                     )
                 )
             return dict(info=ret)
