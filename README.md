@@ -70,7 +70,7 @@ Your instruction is going to be done by calling post_file method with arguments.
 This table shows the  arguments for the method.
 
 | Arguments | Type | Description |
-| --- | --- | --- | --- |
+| --- | --- | --- |
 | process_name | str | Process name to distinguish what process it is. |
 | process_type | filerouter.processType | which process type is choosed to route file, processType.FILE or processType.BYTESIO. |
 | retfile_extension | str | - | File extention that is used for response file. FileRouter is going to create file automatically and pass the path of file to your post_file_process function. |
