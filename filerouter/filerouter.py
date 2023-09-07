@@ -49,13 +49,20 @@ class processor():
         raise NotImplementedError()
 
 
-def preprocess_zip(path, fname, bgtask):
+def preprocess_zip(
+    path: str,
+    fname: str,
+    bgtask: BackgroundTasks
+):
     path_dir_export = f"{path}/{os.path.splitext(fname)[0]}"
     os.makedirs(path_dir_export)
-    bgtask.add_task(tools.remove_dir, path_dir_export)
     with zipfile.ZipFile(f"{path}/{fname}") as zf:
-        zf.extractall(path = path_dir_export)
-    bgtask.add_task(tools.remove_dir, path_dir_export)
+        zf.extractall(path=path_dir_export)
+
+    bgtask.add_task(
+        tools.remove_dir,
+        path_dir_export
+    )
 
 
 class router():
@@ -236,7 +243,10 @@ class router():
             uuid_path = f"{self.data_path}/{str(uuid.uuid4())}"
             fname_dst = tools.make_fname_uuid(retfile_extension)
             file_dst_path = f"{uuid_path}/{fname_dst}"
-            bgtask.add_task(tools.remove_file, file_dst_path)
+            bgtask.add_task(
+                tools.remove_file,
+                file_dst_path
+            )
         else:
             file_dst_path = None
 
@@ -284,7 +294,7 @@ class router():
         else:
             raise ValueError('')
         
-        test = kwargs["test"]
+        test = kwargs["test"] if "test" in kwargs else -1
         if test == 1:
             return await func_temp(
                 process_name,
